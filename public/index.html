@@ -8,7 +8,8 @@
     :root { --ink:#142033; --muted:#5e6c84; --navy:#12355b; --blue:#2474c6; --blue-soft:#eaf3ff; --green:#0b7a53; --green-soft:#e8f7f0; --line:#dce4ee; --paper:#f6f8fb; --white:#fff; }
     * { box-sizing:border-box; } body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 Arial,sans-serif; }
     main { max-width:1120px; margin:auto; padding:42px 24px 60px; }
-    header { background:linear-gradient(120deg,var(--navy),#1f5b96); color:white; border-radius:16px; padding:34px; }
+    header { min-height:270px; display:flex; align-items:flex-end; background-image:linear-gradient(90deg,rgba(10,35,67,.90) 0%,rgba(10,35,67,.72) 48%,rgba(10,35,67,.30) 100%),url('assets/retention-hero.png'); background-position:center; background-size:cover; color:white; border-radius:16px; padding:34px; }
+    .hero-copy { max-width:620px; } .byline { margin:15px 0 0; font-size:13px; font-weight:700; letter-spacing:.04em; opacity:.92; text-transform:uppercase; }
     h1 { margin:0 0 8px; font-size:30px; } h2 { font-size:21px; margin:0 0 12px; } h3 { font-size:15px; margin:0 0 7px; }
     .subtitle { margin:0; opacity:.9; max-width:720px; } .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:20px 0; }
     .card { background:var(--white); border:1px solid var(--line); border-radius:12px; padding:17px; } .label { color:var(--muted); font-size:12px; } .value { font-size:24px; font-weight:700; margin:4px 0; }
@@ -22,7 +23,7 @@
   </style>
 </head>
 <body><main>
-  <header><h1>Customer Growth Decision Intelligence</h1><p class='subtitle'>A leakage-safe churn model translated into a practical retention decision: who to contact, how much to spend, and which assumptions matter.</p></header>
+  <header><div class='hero-copy'><h1>Customer Growth Decision Intelligence</h1><p class='subtitle'>A leakage-safe churn model translated into a practical retention decision: who to contact, how much to spend, and which assumptions matter.</p><p class='byline'>Project made by Baneeth S. Bandi</p></div></header>
   <div class='grid'>
     <div class='card'><div class='label'>Customers evaluated</div><div class='value'>970,960</div><div class='small'>One row per customer</div></div>
     <div class='card'><div class='label'>Overall observed churn</div><div class='value'>8.99%</div><div class='small'>About 9 in every 100 customers</div></div>
