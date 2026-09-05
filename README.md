@@ -4,6 +4,11 @@ An end-to-end churn analytics and retention-prioritization project built with an
 
 > Given a limited retention budget, which customers should a subscription business contact first, and why?
 
+## Live portfolio
+
+- Dashboard: https://customer-growth-intelligence-q65qndouk-baneeths-projects.vercel.app
+- Source code: https://github.com/baneeth/customer-growth-intelligence
+
 ## Business outcome
 
 The project converts raw subscription receipts and customer profiles into one leakage-safe row per customer, predicts churn risk, calibrates risk probabilities, and produces a capacity-based campaign priority list.
