@@ -1,0 +1,12 @@
+{
+  "campaign_capacity_percent": 10,
+  "offer_cost_per_customer": 30.0,
+  "assumed_save_rate": 0.1,
+  "value_months": 6,
+  "monetary_unit_label": "dataset currency units",
+  "value_proxy_multiplier": 1.0,
+  "maximum_campaign_budget": 1000000.0,
+  "capacity_grid_percent": [1, 2, 5, 10, 15, 20, 25, 30],
+  "sensitivity_capacity_percent": [5, 10, 20],
+  "sensitivity_save_rates": [0.05, 0.1, 0.2]
+}

@@ -1,0 +1,6 @@
+payment_frequency_segment,customers,churn_percent
+1-3 payments,96174,22.45
+no safe payment history,33143,20.14
+4-10 payments,204576,9.5
+11-25 payments,554015,6.37
+26+ payments,83052,5.21

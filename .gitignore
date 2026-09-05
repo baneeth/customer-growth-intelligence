@@ -1,0 +1,27 @@
+# Python environment and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local secrets and editor files
+.env
+kaggle.json
+.vscode/
+
+# Large or source-restricted data artifacts; rebuild/download locally
+data/landing/
+data/raw/
+data/silver/
+data/gold/
+data/quarantine/
+models/
+
+# Temporary render and notebook outputs
+work/rendered_*/
+*.tmp
+
+# Personal learning materials; keep local only
+docs/customer_growth_interview_notes.docx
+docs/resume_interview_guide.md
+docs/learning-roadmap.md

@@ -1,0 +1,2 @@
+campaign_capacity_percent,assumed_save_rate_percent,customers_targeted,average_calibrated_risk,expected_churners_from_model,average_monthly_value_proxy,offer_cost_per_customer,value_months,expected_saved_customers,scenario_retained_value,campaign_cost,scenario_net_value,scenario_roi
+10,10.0,19420,0.5111,9924.9,389.07,30.0,6,992.5,2316868.2,582600.0,1734268.2,2.9768

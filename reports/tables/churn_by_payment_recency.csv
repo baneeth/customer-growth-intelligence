@@ -1,0 +1,6 @@
+recency_segment,customers,churn_percent
+over 90 days since payment,33006,71.6
+31-90 days since payment,22714,52.69
+no safe payment history,33143,20.14
+8-30 days since payment,585476,5.62
+0-7 days since payment,296621,4.11

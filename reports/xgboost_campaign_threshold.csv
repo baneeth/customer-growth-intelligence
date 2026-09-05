@@ -1,0 +1,2 @@
+campaign_capacity,calibrated_risk_threshold,customers_targeted,actual_churn_rate_in_targeted_group,overall_test_churn_rate
+top 10 percent of customers by calibrated risk,0.21148036420345306,19420,0.5061791967044285,0.08994191315811156

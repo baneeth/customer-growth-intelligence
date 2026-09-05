@@ -1,0 +1,2 @@
+capacity_percent,customers_targeted,campaign_spend,within_budget,average_calibrated_risk,expected_churners,assumed_save_rate_percent,break_even_save_rate_percent,expected_saved_customers,value_per_saved_customer,scenario_retained_value,scenario_net_value,scenario_roi
+5,9710,291300.0,True,0.7146,6939.2,10.0,1.11,693.9,3768.77,2615214.39,2323914.39,7.9777

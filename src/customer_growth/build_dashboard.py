@@ -1,0 +1,221 @@
+from __future__ import annotations
+
+from html import escape
+from pathlib import Path
+import json
+
+import pandas as pd
+
+
+PROJECT_ROOT = Path(r"C:\Users\banee\Documents\Codex\2026-08-03\b\outputs\customer-growth-intelligence")
+REPORTS = PROJECT_ROOT / "reports"
+CONFIG = PROJECT_ROOT / "configs" / "campaign_scenario.json"
+OUTPUT = REPORTS / "executive_dashboard.html"
+
+
+def money(value: float, label: str) -> str:
+    return f"{value:,.0f} {escape(label)}"
+
+
+def number(value: float, digits: int = 0) -> str:
+    return f"{value:,.{digits}f}"
+
+
+def first_matching_row(frame: pd.DataFrame, text: str) -> pd.Series:
+    mask = frame.astype(str).apply(lambda column: column.str.contains(text, case=False, na=False)).any(axis=1)
+    return frame.loc[mask].iloc[0] if mask.any() else frame.iloc[-1]
+
+
+def horizontal_bar_chart(title: str, rows: list[tuple[str, float]], suffix: str, color: str) -> str:
+    height = 58 * len(rows) + 55
+    bars = []
+    for index, (label, value) in enumerate(rows):
+        y = 42 + index * 58
+        width = value / 100 * 430
+        bars.append(
+            f"<text x='0' y='{y + 17}' class='chart-label'>{escape(label)}</text>"
+            f"<rect x='170' y='{y}' width='430' height='24' rx='4' class='chart-track'/>"
+            f"<rect x='170' y='{y}' width='{width:.1f}' height='24' rx='4' fill='{color}'/>"
+            f"<text x='{min(610, 178 + width):.1f}' y='{y + 17}' class='chart-value'>{value:.2f}{suffix}</text>"
+        )
+    return f"""<svg viewBox='0 0 660 {height}' role='img' aria-label='{escape(title)}'>
+      <title>{escape(title)}</title><text x='0' y='20' class='chart-title'>{escape(title)}</text>{''.join(bars)}</svg>"""
+
+
+def comparison_column_chart(title: str, rows: list[tuple[str, float]]) -> str:
+    maximum, base_y, top_y = max(value for _, value in rows) * 1.15, 245, 60
+    start_x, bar_width, gap = 105, 110, 125
+    bars = []
+    for index, (label, value) in enumerate(rows):
+        height = value / maximum * (base_y - top_y)
+        x, y = start_x + index * (bar_width + gap), base_y - height
+        bars.append(
+            f"<rect x='{x}' y='{y:.1f}' width='{bar_width}' height='{height:.1f}' rx='5' fill='#2474c6'/>"
+            f"<text x='{x + bar_width / 2:.1f}' y='{y - 9:.1f}' text-anchor='middle' class='chart-value'>{value:.2f}%</text>"
+            f"<text x='{x + bar_width / 2:.1f}' y='{base_y + 23}' text-anchor='middle' class='chart-label'>{escape(label)}</text>"
+        )
+    return f"""<svg viewBox='0 0 580 295' role='img' aria-label='{escape(title)}'>
+      <title>{escape(title)}</title><text x='0' y='20' class='chart-title'>{escape(title)}</text>
+      <line x1='55' y1='{base_y}' x2='530' y2='{base_y}' class='chart-axis'/>{''.join(bars)}
+      <text x='292' y='288' text-anchor='middle' class='chart-subtitle'>Customer group</text></svg>"""
+
+
+def model_lollipop_chart(rows: list[tuple[str, float, float]]) -> str:
+    min_value, max_value, axis_x = 0.80, 0.88, 125
+    y_start, y_gap, width = 75, 60, 630
+    marks = []
+    for index, (label, auc, _) in enumerate(rows):
+        y = y_start + index * y_gap
+        x = axis_x + (auc - min_value) / (max_value - min_value) * 430
+        marks.append(
+            f"<text x='0' y='{y + 4}' class='chart-label'>{escape(label)}</text>"
+            f"<line x1='{axis_x}' y1='{y}' x2='{x:.1f}' y2='{y}' class='lollipop-line'/>"
+            f"<circle cx='{x:.1f}' cy='{y}' r='8' fill='#0b7a53'/>"
+            f"<text x='{x + 14:.1f}' y='{y + 4}' class='chart-value'>{auc:.3f}</text>"
+        )
+    ticks = "".join(
+        f"<text x='{axis_x + (tick-min_value)/(max_value-min_value)*430:.1f}' y='266' text-anchor='middle' class='chart-label'>{tick:.2f}</text>"
+        for tick in [0.80, 0.82, 0.84, 0.86, 0.88]
+    )
+    return f"""<svg viewBox='0 0 {width} 285' role='img' aria-label='Model comparison by ROC-AUC'>
+      <title>Model comparison by ROC-AUC</title><text x='0' y='20' class='chart-title'>Model comparison: ROC-AUC</text>
+      <line x1='{axis_x}' y1='235' x2='555' y2='235' class='chart-axis'/>{marks}{ticks}
+      <text x='340' y='283' text-anchor='middle' class='chart-subtitle'>ROC-AUC score</text></svg>"""
+
+
+def campaign_chart(frame: pd.DataFrame, currency: str) -> str:
+    values = frame["scenario_net_value"].astype(float).tolist()
+    maximum = max(values) if values else 1
+    width, height, base_y, top_y = 680, 310, 250, 72
+    gap, start_x = 75, 54
+    points, marks = [], []
+    for index, row in enumerate(frame.itertuples(index=False)):
+        value = float(row.scenario_net_value)
+        x, y = start_x + index * gap, base_y - value / maximum * (base_y - top_y)
+        fill = "#0b7a53" if bool(row.within_budget) else "#94a3b8"
+        label = f"{value / 1_000_000:.2f}M"
+        points.append(f"{x},{y:.1f}")
+        marks.append(
+            f"<circle cx='{x}' cy='{y:.1f}' r='6' fill='{fill}'/>"
+            f"<text x='{x}' y='{y - 11:.1f}' text-anchor='middle' class='chart-value'>{label}</text>"
+            f"<text x='{x}' y='{base_y + 22}' text-anchor='middle' class='chart-label'>{row.capacity_percent:g}%</text>"
+        )
+    return f"""<svg viewBox='0 0 {width} {height}' role='img' aria-label='Modeled net value by campaign size'>
+      <title>Modeled net value by campaign size</title>
+      <text x='0' y='20' class='chart-title'>Modeled net value by campaign size</text>
+      <text x='0' y='43' class='chart-subtitle'>Green: within budget. Gray: above budget. Values shown in millions of {escape(currency)}.</text>
+      <line x1='35' y1='{base_y}' x2='660' y2='{base_y}' class='chart-axis'/><polyline points='{' '.join(points)}' class='campaign-line'/>{''.join(marks)}
+      <text x='347' y='294' text-anchor='middle' class='chart-subtitle'>Campaign capacity</text></svg>"""
+
+
+def risk_driver_chart(title: str, frame: pd.DataFrame, category_column: str) -> str:
+    rows = list(frame[[category_column, "churn_percent"]].itertuples(index=False, name=None))
+    height, label_x, bar_x, bar_width = 58 * len(rows) + 60, 0, 270, 390
+    bars = []
+    for index, (label, value) in enumerate(rows):
+        y = 42 + index * 58
+        width = float(value) / 100 * bar_width
+        bars.append(
+            f"<text x='{label_x}' y='{y + 17}' class='chart-label'>{escape(str(label))}</text>"
+            f"<rect x='{bar_x}' y='{y}' width='{bar_width}' height='24' rx='4' class='chart-track'/>"
+            f"<rect x='{bar_x}' y='{y}' width='{width:.1f}' height='24' rx='4' fill='#2474c6'/>"
+            f"<text x='{min(bar_x + bar_width - 28, bar_x + width + 8):.1f}' y='{y + 17}' class='chart-value'>{float(value):.2f}%</text>"
+        )
+    return f"""<svg viewBox='0 0 710 {height}' role='img' aria-label='{escape(title)}'>
+      <title>{escape(title)}</title><text x='0' y='20' class='chart-title'>{escape(title)}</text>{''.join(bars)}</svg>"""
+
+
+def main() -> None:
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    currency = str(config["monetary_unit_label"])
+    baseline = pd.read_csv(REPORTS / "baseline_model_metrics.csv")
+    xgb = pd.read_csv(REPORTS / "xgboost_model_metrics.csv")
+    spend_options = pd.read_csv(REPORTS / "campaign_spend_optimization.csv")
+    recommendation = pd.read_csv(REPORTS / "campaign_spend_recommendation.csv").iloc[0]
+    auto_renewal = pd.read_csv(REPORTS / "tables" / "churn_by_latest_auto_renewal.csv")
+    payment_recency = pd.read_csv(REPORTS / "tables" / "churn_by_payment_recency.csv")
+    transaction_frequency = pd.read_csv(REPORTS / "tables" / "churn_by_transaction_frequency.csv")
+
+    logistic = first_matching_row(baseline, "logistic")
+    forest = first_matching_row(baseline, "random")
+    calibrated_xgb = first_matching_row(xgb, "calibrated")
+
+    model_rows = [
+        ("Logistic Regression", float(logistic["roc_auc"]), float(logistic["lift_at_top_10_percent"])),
+        ("Random Forest", float(forest["roc_auc"]), float(forest["lift_at_top_10_percent"])),
+        ("Calibrated XGBoost", float(calibrated_xgb["roc_auc"]), float(calibrated_xgb["lift_at_top_10_percent"])),
+    ]
+    max_auc = max(row[1] for row in model_rows)
+    churn_chart = comparison_column_chart(
+        "Churn is concentrated in the model's high-risk group",
+        [("All customers", 8.99), ("Highest-risk 10%", 50.62)],
+    )
+    model_chart = model_lollipop_chart(model_rows)
+    campaign_net_chart = campaign_chart(spend_options, currency)
+    auto_renewal_chart = risk_driver_chart("Churn rate by latest auto-renewal setting", auto_renewal, "latest_auto_renewal")
+    recency_chart = risk_driver_chart("Churn rate by time since latest payment", payment_recency, "recency_segment")
+    frequency_chart = risk_driver_chart("Churn rate by payment-history length", transaction_frequency, "payment_frequency_segment")
+
+    model_html = "".join(
+        f"""<tr><td>{name}</td><td>{auc:.3f}</td><td>{lift:.2f}x</td>
+        <td><div class='bar-track'><div class='bar' style='width:{auc / max_auc * 100:.1f}%'></div></div></td></tr>"""
+        for name, auc, lift in model_rows
+    )
+    spend_html = "".join(
+        f"""<tr class='{ 'recommended' if float(row.capacity_percent) == float(recommendation.capacity_percent) else '' }'>
+        <td>{number(row.capacity_percent)}%</td><td>{number(row.customers_targeted):s}</td>
+        <td>{money(float(row.campaign_spend), currency)}</td>
+        <td>{number(float(row.average_calibrated_risk) * 100, 1)}%</td>
+        <td>{number(float(row.break_even_save_rate_percent), 2)}%</td>
+        <td>{money(float(row.scenario_net_value), currency)}</td>
+        <td>{'Yes' if bool(row.within_budget) else 'No'}</td></tr>"""
+        for row in spend_options.itertuples(index=False)
+    )
+
+    output = f"""<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <title>Customer Growth Decision Intelligence</title>
+  <style>
+    :root {{ --ink:#142033; --muted:#5e6c84; --navy:#12355b; --blue:#2474c6; --blue-soft:#eaf3ff; --green:#0b7a53; --green-soft:#e8f7f0; --line:#dce4ee; --paper:#f6f8fb; --white:#fff; }}
+    * {{ box-sizing:border-box; }} body {{ margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 Arial,sans-serif; }}
+    main {{ max-width:1120px; margin:auto; padding:42px 24px 60px; }}
+    header {{ background:linear-gradient(120deg,var(--navy),#1f5b96); color:white; border-radius:16px; padding:34px; }}
+    h1 {{ margin:0 0 8px; font-size:30px; }} h2 {{ font-size:21px; margin:0 0 12px; }} h3 {{ font-size:15px; margin:0 0 7px; }}
+    .subtitle {{ margin:0; opacity:.9; max-width:720px; }} .grid {{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:20px 0; }}
+    .card {{ background:var(--white); border:1px solid var(--line); border-radius:12px; padding:17px; }} .label {{ color:var(--muted); font-size:12px; }} .value {{ font-size:24px; font-weight:700; margin:4px 0; }}
+    .small {{ color:var(--muted); font-size:12px; }} section {{ margin-top:22px; }} .two {{ display:grid; grid-template-columns:1.1fr .9fr; gap:20px; }}
+    table {{ border-collapse:collapse; width:100%; background:var(--white); border:1px solid var(--line); border-radius:12px; overflow:hidden; }} th,td {{ padding:11px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }} th {{ font-size:12px; color:var(--muted); background:#fbfcfe; }} tr:last-child td {{ border-bottom:0; }} .recommended {{ background:var(--green-soft); font-weight:700; }}
+    .bar-track {{ height:8px; background:#e7edf4; border-radius:8px; width:120px; }} .bar {{ height:100%; background:var(--blue); border-radius:8px; }}
+    .callout {{ background:var(--blue-soft); border-left:4px solid var(--blue); padding:16px; border-radius:6px; }} .green {{ background:var(--green-soft); border-left-color:var(--green); }}
+    .chart {{ background:var(--white); border:1px solid var(--line); border-radius:12px; padding:16px; }} .chart svg {{ display:block; width:100%; height:auto; }} .chart-title {{ fill:var(--ink); font-size:16px; font-weight:700; }} .chart-subtitle,.chart-label {{ fill:var(--muted); font-size:12px; }} .chart-value {{ fill:var(--ink); font-size:12px; font-weight:700; }} .chart-track {{ fill:#e7edf4; }} .chart-axis {{ stroke:var(--line); stroke-width:1; }} .lollipop-line {{ stroke:#a5b4c5; stroke-width:3; }} .campaign-line {{ fill:none; stroke:#2474c6; stroke-width:3; }} .driver-grid {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }} .driver-grid .chart:last-child {{ grid-column:1 / -1; }}
+    .scroll {{ overflow:auto; }} code {{ background:#edf1f6; padding:2px 5px; border-radius:4px; }}
+    @media(max-width:800px) {{ .grid {{ grid-template-columns:repeat(2,1fr); }} .two,.driver-grid {{ grid-template-columns:1fr; }} .driver-grid .chart:last-child {{ grid-column:auto; }} }} @media(max-width:460px) {{ main {{ padding:18px 12px; }} header {{ padding:24px; }} .grid {{ grid-template-columns:1fr; }} h1 {{ font-size:25px; }} }}
+  </style>
+</head>
+<body><main>
+  <header><h1>Customer Growth Decision Intelligence</h1><p class='subtitle'>A leakage-safe churn model translated into a practical retention decision: who to contact, how much to spend, and which assumptions matter.</p></header>
+  <div class='grid'>
+    <div class='card'><div class='label'>Customers evaluated</div><div class='value'>970,960</div><div class='small'>One row per customer</div></div>
+    <div class='card'><div class='label'>Overall observed churn</div><div class='value'>8.99%</div><div class='small'>About 9 in every 100 customers</div></div>
+    <div class='card'><div class='label'>Top-risk 10% observed churn</div><div class='value'>50.62%</div><div class='small'>About 51 in every 100 customers</div></div>
+    <div class='card'><div class='label'>Best model</div><div class='value'>0.870</div><div class='small'>Calibrated XGBoost ROC-AUC</div></div>
+  </div>
+  <section class='two'><div class='card'><h2>What the model tells us</h2><p>The model ranks every customer by churn risk. The business chooses how many of the highest-risk customers it can afford to contact.</p><div class='callout'><strong>Key warning sign:</strong> customers with auto-renewal turned off had 38.70% observed churn, compared with 4.67% when it was on. This is a predictive association, not proof of cause.</div></div>
+  <div class='card'><h2>Prediction-time rule</h2><p>Features use only information known on or before <strong>January 31, 2017</strong>.</p><p class='small'>February/March activity belongs to the future answer sheet, so it was never used as an input. This prevents data leakage.</p></div></section>
+  <section><h2>Model comparison</h2><div class='scroll'><table><thead><tr><th>Model</th><th>ROC-AUC</th><th>Top-10% lift</th><th>Relative AUC</th></tr></thead><tbody>{model_html}</tbody></table></div></section>
+  <section class='two'><div class='chart'>{churn_chart}</div><div class='chart'>{model_chart}</div></section>
+  <section><h2>Why customers are at risk</h2><p class='small'>These charts show patterns in the observed data. They identify strong warning signs; they do not prove that a single behavior causes churn.</p><div class='driver-grid'><div class='chart'>{auto_renewal_chart}</div><div class='chart'>{frequency_chart}</div><div class='chart'>{recency_chart}</div></div></section>
+  <section><div class='callout green'><h2>Recommended scenario under current assumptions</h2><p><strong>Contact the top {number(float(recommendation.capacity_percent))}%:</strong> {number(float(recommendation.customers_targeted)):s} customers. Spend {money(float(recommendation.campaign_spend), currency)} and target a group with {number(float(recommendation.average_calibrated_risk)*100,1)}% average calibrated churn risk.</p><p>Modeled net value: <strong>{money(float(recommendation.scenario_net_value), currency)}</strong>. Break-even save rate: <strong>{number(float(recommendation.break_even_save_rate_percent),2)}%</strong>.</p></div></section>
+  <section><h2>Campaign-size comparison</h2><p class='small'>The highlighted row maximizes modeled net value among options inside the configured budget. These are scenario results, not realized profit.</p><div class='scroll'><table><thead><tr><th>Capacity</th><th>Customers</th><th>Spend</th><th>Avg. risk</th><th>Break-even save rate</th><th>Modeled net value</th><th>Within budget</th></tr></thead><tbody>{spend_html}</tbody></table></div></section>
+  <section class='chart'>{campaign_net_chart}</section>
+  <section class='two'><div class='card'><h2>Assumptions you can change</h2><p>Edit <code>configs/campaign_scenario.json</code>:</p><ul><li>Offer cost per customer</li><li>Expected save rate</li><li>Months of retained value</li><li>Value multiplier and unit label</li><li>Campaign budget and tested sizes</li></ul></div><div class='card'><h2>Responsible interpretation</h2><p>Dataset subscription payments are used as a value proxy, not verified profit or lifetime value. A real launch needs an experiment with a holdout group to measure whether the offer actually saves customers.</p></div></section>
+</main></body></html>"""
+    OUTPUT.write_text(output, encoding="utf-8")
+    print(OUTPUT)
+
+
+if __name__ == "__main__":
+    main()
