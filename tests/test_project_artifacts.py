@@ -68,8 +68,11 @@ def test_campaign_recommendation_is_affordable_and_best_feasible_option():
 
 def test_dashboard_contains_required_decision_visuals():
     dashboard = PROJECT_ROOT / "reports/executive_dashboard.html"
+    public_dashboard = PROJECT_ROOT / "public/index.html"
     assert dashboard.exists()
+    assert public_dashboard.exists()
     html = dashboard.read_text(encoding="utf-8")
+    assert public_dashboard.read_text(encoding="utf-8") == html
 
     required_titles = [
         "Churn is concentrated in the model",

@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(r"C:\Users\banee\Documents\Codex\2026-08-03\b\outputs\custom
 REPORTS = PROJECT_ROOT / "reports"
 CONFIG = PROJECT_ROOT / "configs" / "campaign_scenario.json"
 OUTPUT = REPORTS / "executive_dashboard.html"
+PUBLIC_DASHBOARD = PROJECT_ROOT / "public" / "index.html"
 
 
 def money(value: float, label: str) -> str:
@@ -214,7 +215,10 @@ def main() -> None:
   <section class='two'><div class='card'><h2>Assumptions you can change</h2><p>Edit <code>configs/campaign_scenario.json</code>:</p><ul><li>Offer cost per customer</li><li>Expected save rate</li><li>Months of retained value</li><li>Value multiplier and unit label</li><li>Campaign budget and tested sizes</li></ul></div><div class='card'><h2>Responsible interpretation</h2><p>Dataset subscription payments are used as a value proxy, not verified profit or lifetime value. A real launch needs an experiment with a holdout group to measure whether the offer actually saves customers.</p></div></section>
 </main></body></html>"""
     OUTPUT.write_text(output, encoding="utf-8")
+    PUBLIC_DASHBOARD.parent.mkdir(parents=True, exist_ok=True)
+    PUBLIC_DASHBOARD.write_text(output, encoding="utf-8")
     print(OUTPUT)
+    print(PUBLIC_DASHBOARD)
 
 
 if __name__ == "__main__":
