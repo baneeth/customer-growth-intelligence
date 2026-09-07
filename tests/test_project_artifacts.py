@@ -75,12 +75,12 @@ def test_dashboard_contains_required_decision_visuals():
     assert public_dashboard.read_text(encoding="utf-8") == html
 
     required_titles = [
-        "Churn is concentrated in the model",
-        "Model comparison: ROC-AUC",
-        "Churn rate by latest auto-renewal setting",
-        "Churn rate by time since latest payment",
-        "Churn rate by payment-history length",
-        "Modeled net value by campaign size",
+        "The top of the contact list contains far more churn",
+        "How well each approach ranks customer risk",
+        "Customers with auto-renewal off are much more likely to leave",
+        "Time since last payment: a strong early warning sign",
+        "Longer payment history is linked with lower churn",
+        "Estimated value by campaign size",
     ]
     assert all(title in html for title in required_titles)
     assert html.count("<svg") >= 6

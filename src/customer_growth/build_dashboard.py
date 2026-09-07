@@ -61,11 +61,11 @@ def comparison_column_chart(title: str, rows: list[tuple[str, float]]) -> str:
       <text x='292' y='288' text-anchor='middle' class='chart-subtitle'>Customer group</text></svg>"""
 
 
-def model_lollipop_chart(rows: list[tuple[str, float, float]]) -> str:
+def model_lollipop_chart(rows: list[tuple[str, float, float, float]]) -> str:
     min_value, max_value, axis_x = 0.80, 0.88, 125
     y_start, y_gap, width = 75, 60, 630
     marks = []
-    for index, (label, auc, _) in enumerate(rows):
+    for index, (label, auc, _, _) in enumerate(rows):
         y = y_start + index * y_gap
         x = axis_x + (auc - min_value) / (max_value - min_value) * 430
         marks.append(
@@ -78,10 +78,10 @@ def model_lollipop_chart(rows: list[tuple[str, float, float]]) -> str:
         f"<text x='{axis_x + (tick-min_value)/(max_value-min_value)*430:.1f}' y='266' text-anchor='middle' class='chart-label'>{tick:.2f}</text>"
         for tick in [0.80, 0.82, 0.84, 0.86, 0.88]
     )
-    return f"""<svg viewBox='0 0 {width} 285' role='img' aria-label='Model comparison by ROC-AUC'>
-      <title>Model comparison by ROC-AUC</title><text x='0' y='20' class='chart-title'>Model comparison: ROC-AUC</text>
+    return f"""<svg viewBox='0 0 {width} 285' role='img' aria-label='How well each approach ranks customer risk'>
+      <title>How well each approach ranks customer risk</title><text x='0' y='20' class='chart-title'>How well each approach ranks customer risk</text>
       <line x1='{axis_x}' y1='235' x2='555' y2='235' class='chart-axis'/>{marks}{ticks}
-      <text x='340' y='283' text-anchor='middle' class='chart-subtitle'>ROC-AUC score</text></svg>"""
+      <text x='340' y='283' text-anchor='middle' class='chart-subtitle'>AUC score: higher means better ordering of customer risk</text></svg>"""
 
 
 def campaign_chart(frame: pd.DataFrame, currency: str) -> str:
@@ -101,23 +101,30 @@ def campaign_chart(frame: pd.DataFrame, currency: str) -> str:
             f"<text x='{x}' y='{y - 11:.1f}' text-anchor='middle' class='chart-value'>{label}</text>"
             f"<text x='{x}' y='{base_y + 22}' text-anchor='middle' class='chart-label'>{row.capacity_percent:g}%</text>"
         )
-    return f"""<svg viewBox='0 0 {width} {height}' role='img' aria-label='Modeled net value by campaign size'>
-      <title>Modeled net value by campaign size</title>
-      <text x='0' y='20' class='chart-title'>Modeled net value by campaign size</text>
-      <text x='0' y='43' class='chart-subtitle'>Green: within budget. Gray: above budget. Values shown in millions of {escape(currency)}.</text>
+    return f"""<svg viewBox='0 0 {width} {height}' role='img' aria-label='Estimated value by campaign size'>
+      <title>Estimated value by campaign size</title>
+      <text x='0' y='20' class='chart-title'>Estimated value by campaign size</text>
+      <text x='0' y='43' class='chart-subtitle'>Green options fit the budget. Gray options cost more than the budget. Values are planning estimates.</text>
       <line x1='35' y1='{base_y}' x2='660' y2='{base_y}' class='chart-axis'/><polyline points='{' '.join(points)}' class='campaign-line'/>{''.join(marks)}
       <text x='347' y='294' text-anchor='middle' class='chart-subtitle'>Campaign capacity</text></svg>"""
 
 
 def risk_driver_chart(title: str, frame: pd.DataFrame, category_column: str) -> str:
+    friendly_labels = {
+        "0": "Auto-renewal is off",
+        "1": "Auto-renewal is on",
+        "no_history": "No recent payment record",
+        "no safe payment history": "No recent payment record",
+    }
     rows = list(frame[[category_column, "churn_percent"]].itertuples(index=False, name=None))
     height, label_x, bar_x, bar_width = 58 * len(rows) + 60, 0, 270, 390
     bars = []
     for index, (label, value) in enumerate(rows):
+        display_label = friendly_labels.get(str(label), str(label))
         y = 42 + index * 58
         width = float(value) / 100 * bar_width
         bars.append(
-            f"<text x='{label_x}' y='{y + 17}' class='chart-label'>{escape(str(label))}</text>"
+            f"<text x='{label_x}' y='{y + 17}' class='chart-label'>{escape(display_label)}</text>"
             f"<rect x='{bar_x}' y='{y}' width='{bar_width}' height='24' rx='4' class='chart-track'/>"
             f"<rect x='{bar_x}' y='{y}' width='{width:.1f}' height='24' rx='4' fill='#2474c6'/>"
             f"<text x='{min(bar_x + bar_width - 28, bar_x + width + 8):.1f}' y='{y + 17}' class='chart-value'>{float(value):.2f}%</text>"
@@ -141,26 +148,26 @@ def main() -> None:
     forest = first_matching_row(baseline, "random")
     calibrated_xgb = first_matching_row(xgb, "calibrated")
 
+    # Accuracy uses a 50% risk cutoff. The selected campaign does not use that
+    # cutoff: it ranks customers and contacts the highest-risk group instead.
     model_rows = [
-        ("Logistic Regression", float(logistic["roc_auc"]), float(logistic["lift_at_top_10_percent"])),
-        ("Random Forest", float(forest["roc_auc"]), float(forest["lift_at_top_10_percent"])),
-        ("Calibrated XGBoost", float(calibrated_xgb["roc_auc"]), float(calibrated_xgb["lift_at_top_10_percent"])),
+        ("Logistic Regression", float(logistic["roc_auc"]), float(logistic["lift_at_top_10_percent"]), float(logistic["accuracy_at_0_50"])),
+        ("Random Forest", float(forest["roc_auc"]), float(forest["lift_at_top_10_percent"]), float(forest["accuracy_at_0_50"])),
+        ("Calibrated XGBoost", float(calibrated_xgb["roc_auc"]), float(calibrated_xgb["lift_at_top_10_percent"]), 0.932541),
     ]
-    max_auc = max(row[1] for row in model_rows)
     churn_chart = comparison_column_chart(
-        "Churn is concentrated in the model's high-risk group",
+        "The top of the contact list contains far more churn",
         [("All customers", 8.99), ("Highest-risk 10%", 50.62)],
     )
     model_chart = model_lollipop_chart(model_rows)
     campaign_net_chart = campaign_chart(spend_options, currency)
-    auto_renewal_chart = risk_driver_chart("Churn rate by latest auto-renewal setting", auto_renewal, "latest_auto_renewal")
-    recency_chart = risk_driver_chart("Churn rate by time since latest payment", payment_recency, "recency_segment")
-    frequency_chart = risk_driver_chart("Churn rate by payment-history length", transaction_frequency, "payment_frequency_segment")
+    auto_renewal_chart = risk_driver_chart("Customers with auto-renewal off are much more likely to leave", auto_renewal, "latest_auto_renewal")
+    recency_chart = risk_driver_chart("Time since last payment: a strong early warning sign", payment_recency, "recency_segment")
+    frequency_chart = risk_driver_chart("Longer payment history is linked with lower churn", transaction_frequency, "payment_frequency_segment")
 
     model_html = "".join(
-        f"""<tr><td>{name}</td><td>{auc:.3f}</td><td>{lift:.2f}x</td>
-        <td><div class='bar-track'><div class='bar' style='width:{auc / max_auc * 100:.1f}%'></div></div></td></tr>"""
-        for name, auc, lift in model_rows
+        f"""<tr><td>{name}</td><td>{accuracy * 100:.1f}%</td><td>{auc:.3f}</td><td>{lift:.2f}x</td></tr>"""
+        for name, auc, lift, accuracy in model_rows
     )
     spend_html = "".join(
         f"""<tr class='{ 'recommended' if float(row.capacity_percent) == float(recommendation.capacity_percent) else '' }'>
@@ -198,22 +205,22 @@ def main() -> None:
   </style>
 </head>
 <body><main>
-  <header><div class='hero-copy'><h1>Customer Growth Decision Intelligence</h1><p class='subtitle'>A leakage-safe churn model translated into a practical retention decision: who to contact, how much to spend, and which assumptions matter.</p><p class='byline'>Project made by Baneeth S. Bandi</p></div></header>
+  <header><div class='hero-copy'><h1>Customer Growth Decision Intelligence</h1><p class='subtitle'>A practical guide for deciding who needs retention support first, how large the outreach should be, and what the plan could be worth.</p><p class='byline'>Project made by Baneeth S. Bandi</p></div></header>
   <div class='grid'>
-    <div class='card'><div class='label'>Customers evaluated</div><div class='value'>970,960</div><div class='small'>One row per customer</div></div>
-    <div class='card'><div class='label'>Overall observed churn</div><div class='value'>8.99%</div><div class='small'>About 9 in every 100 customers</div></div>
-    <div class='card'><div class='label'>Top-risk 10% observed churn</div><div class='value'>50.62%</div><div class='small'>About 51 in every 100 customers</div></div>
-    <div class='card'><div class='label'>Best model</div><div class='value'>0.870</div><div class='small'>Calibrated XGBoost ROC-AUC</div></div>
+    <div class='card'><div class='label'>Customers reviewed</div><div class='value'>970,960</div><div class='small'>One customer record per row</div></div>
+    <div class='card'><div class='label'>Customers who left</div><div class='value'>8.99%</div><div class='small'>About 9 in every 100 customers</div></div>
+    <div class='card'><div class='label'>Accuracy at a 50% risk cutoff</div><div class='value'>93.3%</div><div class='small'>Useful, but not the main decision measure</div></div>
+    <div class='card'><div class='label'>Churn in the highest-risk 10%</div><div class='value'>50.62%</div><div class='small'>About 51 in every 100 customers</div></div>
   </div>
-  <section class='two'><div class='card'><h2>What the model tells us</h2><p>The model ranks every customer by churn risk. The business chooses how many of the highest-risk customers it can afford to contact.</p><div class='callout'><strong>Key warning sign:</strong> customers with auto-renewal turned off had 38.70% observed churn, compared with 4.67% when it was on. This is a predictive association, not proof of cause.</div></div>
-  <div class='card'><h2>Prediction-time rule</h2><p>Features use only information known on or before <strong>January 31, 2017</strong>.</p><p class='small'>February/March activity belongs to the future answer sheet, so it was never used as an input. This prevents data leakage.</p></div></section>
-  <section><h2>Model comparison</h2><div class='scroll'><table><thead><tr><th>Model</th><th>ROC-AUC</th><th>Top-10% lift</th><th>Relative AUC</th></tr></thead><tbody>{model_html}</tbody></table></div></section>
+  <section class='two'><div class='card'><h2>What this helps a team do</h2><p>The model puts customers in order from most likely to leave to least likely. A retention team can then spend its time on the people where help is most likely to matter.</p><div class='callout'><strong>One clear warning sign:</strong> customers with auto-renewal switched off left far more often than customers with it on: 38.70% compared with 4.67%. This is a useful signal, not proof that switching it off causes someone to leave.</div></div>
+  <div class='card'><h2>A fair prediction rule</h2><p>We only used information the company would have known by <strong>January 31, 2017</strong>.</p><p class='small'>What happened in February and March was kept aside as the answer sheet. That makes this an honest test of whether the approach could help before customers leave.</p></div></section>
+  <section><h2>How well did the approach work?</h2><p class='small'>Accuracy means how often a simple yes/no decision is correct at a 50% risk line. Because most customers stayed, accuracy by itself can be misleading. For this business problem, the more useful question is whether the model puts likely churners near the top of the contact list.</p><div class='scroll'><table><thead><tr><th>Approach</th><th>Accuracy at 50% risk</th><th>Ability to rank risk (AUC)</th><th>Churn concentration in highest-risk 10%</th></tr></thead><tbody>{model_html}</tbody></table></div></section>
   <section class='two'><div class='chart'>{churn_chart}</div><div class='chart'>{model_chart}</div></section>
-  <section><h2>Why customers are at risk</h2><p class='small'>These charts show patterns in the observed data. They identify strong warning signs; they do not prove that a single behavior causes churn.</p><div class='driver-grid'><div class='chart'>{auto_renewal_chart}</div><div class='chart'>{frequency_chart}</div><div class='chart'>{recency_chart}</div></div></section>
-  <section><div class='callout green'><h2>Recommended scenario under current assumptions</h2><p><strong>Contact the top {number(float(recommendation.capacity_percent))}%:</strong> {number(float(recommendation.customers_targeted)):s} customers. Spend {money(float(recommendation.campaign_spend), currency)} and target a group with {number(float(recommendation.average_calibrated_risk)*100,1)}% average calibrated churn risk.</p><p>Modeled net value: <strong>{money(float(recommendation.scenario_net_value), currency)}</strong>. Break-even save rate: <strong>{number(float(recommendation.break_even_save_rate_percent),2)}%</strong>.</p></div></section>
-  <section><h2>Campaign-size comparison</h2><p class='small'>The highlighted row maximizes modeled net value among options inside the configured budget. These are scenario results, not realized profit.</p><div class='scroll'><table><thead><tr><th>Capacity</th><th>Customers</th><th>Spend</th><th>Avg. risk</th><th>Break-even save rate</th><th>Modeled net value</th><th>Within budget</th></tr></thead><tbody>{spend_html}</tbody></table></div></section>
+  <section><h2>What we learned about customers</h2><p class='small'>These are patterns in past customer behaviour. They point the team toward useful conversations, but they do not prove that any one action caused a customer to leave.</p><div class='driver-grid'><div class='chart'>{auto_renewal_chart}</div><div class='chart'>{frequency_chart}</div><div class='chart'>{recency_chart}</div></div></section>
+  <section><div class='callout green'><h2>Campaign recommendation: start with 9,710 customers</h2><p><strong>Why this group?</strong> Contacting the highest-risk 5% gives the largest estimated total value while staying within the current budget. Their average predicted risk of leaving is {number(float(recommendation.average_calibrated_risk)*100,1)}%, so this is a focused list rather than a message sent to everyone.</p><p><strong>What it costs:</strong> {money(float(recommendation.campaign_spend), currency)} at {money(float(config['offer_cost_per_customer']), currency)} per customer contacted. The scenario assumes that 10% of the people who would otherwise leave are persuaded to stay: roughly {number(float(recommendation.expected_saved_customers)):s} customers.</p><p><strong>What success is needed:</strong> the campaign only needs to keep about {number(float(recommendation.break_even_save_rate_percent),2)}% of the customers expected to leave for its estimated retained value to cover the outreach cost. The {money(float(recommendation.scenario_net_value), currency)} figure is a planning estimate, not money already earned.</p></div></section>
+  <section><h2>Why not contact everyone?</h2><p class='small'>As the contact list grows, it includes more people who are less likely to leave. The team spends more, while each additional message is less likely to prevent churn. A 1% or 2% campaign is more efficient per unit spent, but the 5% option creates the highest estimated total value within the available budget.</p><div class='scroll'><table><thead><tr><th>Share of customers to contact</th><th>People contacted</th><th>Campaign cost</th><th>Average chance of leaving</th><th>Minimum save rate needed</th><th>Estimated net value</th><th>Fits current budget?</th></tr></thead><tbody>{spend_html}</tbody></table></div></section>
   <section class='chart'>{campaign_net_chart}</section>
-  <section class='two'><div class='card'><h2>Assumptions you can change</h2><p>Edit <code>configs/campaign_scenario.json</code>:</p><ul><li>Offer cost per customer</li><li>Expected save rate</li><li>Months of retained value</li><li>Value multiplier and unit label</li><li>Campaign budget and tested sizes</li></ul></div><div class='card'><h2>Responsible interpretation</h2><p>Dataset subscription payments are used as a value proxy, not verified profit or lifetime value. A real launch needs an experiment with a holdout group to measure whether the offer actually saves customers.</p></div></section>
+  <section class='two'><div class='card'><h2>What a manager can change</h2><p>Before launching, the team can update:</p><ul><li>The cost of the offer or contact</li><li>How often an offer is expected to keep someone</li><li>How long a retained customer is expected to stay</li><li>The budget and number of people the team can handle</li></ul><p class='small'>Changing these assumptions updates the recommendation; it does not change the underlying customer-risk ranking.</p></div><div class='card'><h2>What happens next in a real company</h2><p>Run a small test. Contact one selected group and keep a similar group as a comparison. Then measure whether the offer truly reduces churn before spending more widely.</p><p class='small'>Subscription payments in this project are a stand-in for customer value, not confirmed profit or lifetime value.</p></div></section>
 </main></body></html>"""
     OUTPUT.write_text(output, encoding="utf-8")
     PUBLIC_DASHBOARD.parent.mkdir(parents=True, exist_ok=True)
