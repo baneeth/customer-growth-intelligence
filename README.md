@@ -19,13 +19,13 @@ The model ranks every customer. Campaign capacity is a business choice: target t
 
 All models were evaluated on the same 194,192 unseen customers.
 
-| Model | ROC-AUC | Top-10% lift |
-|---|---:|---:|
-| Logistic Regression | 0.824 | 5.15x |
-| Random Forest | 0.862 | 5.52x |
-| XGBoost | **0.870** | **5.63x** |
+| Model | Accuracy at 50% risk | ROC-AUC | Top-10% lift |
+|---|---:|---:|---:|
+| Calibrated XGBoost | 93.25% | **0.870** | 5.63x |
+| Calibrated CatBoost | 93.23% | 0.870 | 5.65x |
+| Calibrated LightGBM | **93.35%** | 0.869 | **5.65x** |
 
-The overall test churn rate was 8.99%. In the XGBoost top-risk 10%, the observed churn rate was 50.62%.
+LightGBM was selected for campaign ranking because it concentrated the most observed churn in the highest-risk 10% (50.79%), had the best probability reliability, and achieved the best accuracy and average precision. XGBoost had a very slightly higher overall ROC-AUC (0.870 versus 0.869). This is why the winner is selected using contact-list performance first, rather than AUC alone.
 
 ## How the business would use it
 
@@ -52,7 +52,7 @@ raw source data
   -> profiling and source-coverage checks
   -> leakage-safe customer snapshot (one row per customer)
   -> model input with safe categories and missingness signals
-  -> baseline models and XGBoost
+  -> modern-model tournament: XGBoost, CatBoost, and LightGBM
   -> probability calibration
   -> ranked campaign priority list and scenario analysis
 ```
@@ -110,8 +110,11 @@ python src/customer_growth/build_analytics.py
 # Train Logistic Regression and Random Forest
 python src/customer_growth/train_baseline_models.py
 
-# Train XGBoost, calibrate probabilities, and create campaign threshold reports
+# Train the initial XGBoost benchmark and calibration reports
 python src/customer_growth/train_xgboost_and_calibrate.py
+
+# Run CatBoost and LightGBM on the same split, then select the campaign champion
+python src/customer_growth/train_model_tournament.py
 
 # Build capacity and campaign-economics scenario outputs
 python src/customer_growth/build_campaign_decision_support.py
@@ -131,6 +134,9 @@ python -m pytest -q
 - `reports/retention_analytics_summary.md`
 - `reports/baseline_model_summary.md`
 - `reports/xgboost_calibration_summary.md`
+- `reports/model_tournament_summary.md`
+- `reports/model_tournament_metrics.csv`
+- `reports/model_tournament_winner.json`
 - `reports/campaign_decision_support.md`
 - `reports/campaign_spend_optimization.md`
 - `reports/campaign_spend_recommendation.csv`

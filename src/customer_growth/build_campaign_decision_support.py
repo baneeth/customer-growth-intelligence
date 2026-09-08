@@ -8,10 +8,11 @@ import pandas as pd
 
 PROJECT_ROOT = Path(r"C:\Users\banee\Documents\Codex\2026-08-03\b\outputs\customer-growth-intelligence")
 MODEL_INPUT = PROJECT_ROOT / "data" / "gold" / "model_input_2017-01-31.parquet"
-PREDICTIONS = PROJECT_ROOT / "data" / "gold" / "test_predictions_xgboost.parquet"
+PREDICTIONS = PROJECT_ROOT / "data" / "gold" / "test_predictions_model_tournament.parquet"
 CONFIG = PROJECT_ROOT / "configs" / "campaign_scenario.json"
 REPORTS = PROJECT_ROOT / "reports"
 OUTPUT = PROJECT_ROOT / "data" / "gold" / "campaign_priority_list.parquet"
+RISK_COLUMN = "champion_calibrated_probability"
 
 
 def markdown_table(frame: pd.DataFrame) -> str:
@@ -24,8 +25,8 @@ def markdown_table(frame: pd.DataFrame) -> str:
 
 def scenario_summary(frame: pd.DataFrame, capacity_percent: float, save_rate: float, offer_cost: float, value_months: int) -> dict:
     target_count = math.ceil(len(frame) * capacity_percent / 100)
-    priority = frame.nlargest(target_count, "xgboost_calibrated_probability")
-    expected_churners = priority["xgboost_calibrated_probability"].sum()
+    priority = frame.nlargest(target_count, RISK_COLUMN)
+    expected_churners = priority[RISK_COLUMN].sum()
     value_proxy = priority["monthly_value_proxy"].mean()
     expected_saved_customers = expected_churners * save_rate
     expected_retained_value = expected_saved_customers * value_proxy * value_months
@@ -35,7 +36,7 @@ def scenario_summary(frame: pd.DataFrame, capacity_percent: float, save_rate: fl
         "campaign_capacity_percent": capacity_percent,
         "assumed_save_rate_percent": round(save_rate * 100, 2),
         "customers_targeted": target_count,
-        "average_calibrated_risk": round(priority["xgboost_calibrated_probability"].mean(), 4),
+        "average_calibrated_risk": round(priority[RISK_COLUMN].mean(), 4),
         "expected_churners_from_model": round(expected_churners, 1),
         "average_monthly_value_proxy": round(value_proxy, 2),
         "offer_cost_per_customer": offer_cost,
@@ -64,7 +65,7 @@ def main() -> None:
     if not 0 < capacity <= 100:
         raise ValueError("campaign_capacity_percent must be between 0 and 100.")
     selected_count = math.ceil(len(frame) * capacity / 100)
-    priority = frame.nlargest(selected_count, "xgboost_calibrated_probability").copy()
+    priority = frame.nlargest(selected_count, RISK_COLUMN).copy()
     priority["risk_rank"] = range(1, len(priority) + 1)
     priority["campaign_capacity_percent"] = capacity
     # The actual test label is excluded from the deployable list.

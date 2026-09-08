@@ -40,14 +40,27 @@ def test_model_input_preserves_customer_grain_and_safe_categories():
     assert "age_unknown_flag" in model_input.columns
 
 
-def test_calibrated_probabilities_are_real_probabilities():
-    predictions = read_parquet("data/gold/test_predictions_xgboost.parquet")
+def test_selected_model_probabilities_are_real_probabilities():
+    predictions = read_parquet("data/gold/test_predictions_model_tournament.parquet")
 
-    probability = predictions["xgboost_calibrated_probability"]
+    probability = predictions["champion_calibrated_probability"]
     assert predictions["msno"].is_unique
     assert probability.notna().all()
     assert probability.between(0, 1).all()
     assert probability.nunique() > 100
+
+
+def test_model_tournament_selects_the_best_contact_prioritisation_model():
+    reports = PROJECT_ROOT / "reports"
+    metrics = pd.read_csv(reports / "model_tournament_metrics.csv")
+    winner = json.loads((reports / "model_tournament_winner.json").read_text(encoding="utf-8"))
+    expected = metrics.sort_values(
+        ["lift_at_top_10_percent", "brier_score", "average_precision", "roc_auc"],
+        ascending=[False, True, False, False],
+    ).iloc[0]
+
+    assert winner["selected_model"] == expected["model"]
+    assert winner["selected_model"] == "lightgbm_isotonic_calibrated"
 
 
 def test_campaign_recommendation_is_affordable_and_best_feasible_option():

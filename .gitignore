@@ -16,6 +16,7 @@ data/silver/
 data/gold/
 data/quarantine/
 models/
+catboost_info/
 
 # Temporary render and notebook outputs
 work/rendered_*/

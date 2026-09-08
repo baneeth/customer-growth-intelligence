@@ -136,28 +136,35 @@ def risk_driver_chart(title: str, frame: pd.DataFrame, category_column: str) -> 
 def main() -> None:
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     currency = str(config["monetary_unit_label"])
-    baseline = pd.read_csv(REPORTS / "baseline_model_metrics.csv")
-    xgb = pd.read_csv(REPORTS / "xgboost_model_metrics.csv")
+    tournament = pd.read_csv(REPORTS / "model_tournament_metrics.csv")
+    winner = json.loads((REPORTS / "model_tournament_winner.json").read_text(encoding="utf-8"))
     spend_options = pd.read_csv(REPORTS / "campaign_spend_optimization.csv")
     recommendation = pd.read_csv(REPORTS / "campaign_spend_recommendation.csv").iloc[0]
     auto_renewal = pd.read_csv(REPORTS / "tables" / "churn_by_latest_auto_renewal.csv")
     payment_recency = pd.read_csv(REPORTS / "tables" / "churn_by_payment_recency.csv")
     transaction_frequency = pd.read_csv(REPORTS / "tables" / "churn_by_transaction_frequency.csv")
 
-    logistic = first_matching_row(baseline, "logistic")
-    forest = first_matching_row(baseline, "random")
-    calibrated_xgb = first_matching_row(xgb, "calibrated")
-
-    # Accuracy uses a 50% risk cutoff. The selected campaign does not use that
-    # cutoff: it ranks customers and contacts the highest-risk group instead.
+    friendly_names = {
+        "xgboost_isotonic_calibrated": "Calibrated XGBoost",
+        "catboost_isotonic_calibrated": "Calibrated CatBoost",
+        "lightgbm_isotonic_calibrated": "Calibrated LightGBM",
+    }
+    # Accuracy uses a 50% risk cutoff. The campaign itself ranks customers and
+    # contacts the highest-risk group, so top-10% lift is the lead decision metric.
     model_rows = [
-        ("Logistic Regression", float(logistic["roc_auc"]), float(logistic["lift_at_top_10_percent"]), float(logistic["accuracy_at_0_50"])),
-        ("Random Forest", float(forest["roc_auc"]), float(forest["lift_at_top_10_percent"]), float(forest["accuracy_at_0_50"])),
-        ("Calibrated XGBoost", float(calibrated_xgb["roc_auc"]), float(calibrated_xgb["lift_at_top_10_percent"]), 0.932541),
+        (
+            friendly_names[str(row.model)],
+            float(row.roc_auc),
+            float(row.lift_at_top_10_percent),
+            float(row.accuracy_at_50_percent_risk),
+        )
+        for row in tournament.itertuples(index=False)
     ]
+    selected = tournament.loc[tournament["model"] == winner["selected_model"]].iloc[0]
+    selected_name = friendly_names[str(selected["model"])]
     churn_chart = comparison_column_chart(
         "The top of the contact list contains far more churn",
-        [("All customers", 8.99), ("Highest-risk 10%", 50.62)],
+        [("All customers", 8.99), ("Highest-risk 10%", float(selected["top_10_percent_actual_churn"]) * 100)],
     )
     model_chart = model_lollipop_chart(model_rows)
     campaign_net_chart = campaign_chart(spend_options, currency)
@@ -209,12 +216,12 @@ def main() -> None:
   <div class='grid'>
     <div class='card'><div class='label'>Customers reviewed</div><div class='value'>970,960</div><div class='small'>One customer record per row</div></div>
     <div class='card'><div class='label'>Customers who left</div><div class='value'>8.99%</div><div class='small'>About 9 in every 100 customers</div></div>
-    <div class='card'><div class='label'>Accuracy at a 50% risk cutoff</div><div class='value'>93.3%</div><div class='small'>Useful, but not the main decision measure</div></div>
-    <div class='card'><div class='label'>Churn in the highest-risk 10%</div><div class='value'>50.62%</div><div class='small'>About 51 in every 100 customers</div></div>
+    <div class='card'><div class='label'>Accuracy at a 50% risk cutoff</div><div class='value'>{number(float(selected['accuracy_at_50_percent_risk']) * 100, 1)}%</div><div class='small'>{selected_name}, selected after a fair model tournament</div></div>
+    <div class='card'><div class='label'>Churn in the highest-risk 10%</div><div class='value'>{number(float(selected['top_10_percent_actual_churn']) * 100, 2)}%</div><div class='small'>About 51 in every 100 customers</div></div>
   </div>
   <section class='two'><div class='card'><h2>What this helps a team do</h2><p>The model puts customers in order from most likely to leave to least likely. A retention team can then spend its time on the people where help is most likely to matter.</p><div class='callout'><strong>One clear warning sign:</strong> customers with auto-renewal switched off left far more often than customers with it on: 38.70% compared with 4.67%. This is a useful signal, not proof that switching it off causes someone to leave.</div></div>
   <div class='card'><h2>A fair prediction rule</h2><p>We only used information the company would have known by <strong>January 31, 2017</strong>.</p><p class='small'>What happened in February and March was kept aside as the answer sheet. That makes this an honest test of whether the approach could help before customers leave.</p></div></section>
-  <section><h2>How well did the approach work?</h2><p class='small'>Accuracy means how often a simple yes/no decision is correct at a 50% risk line. Because most customers stayed, accuracy by itself can be misleading. For this business problem, the more useful question is whether the model puts likely churners near the top of the contact list.</p><div class='scroll'><table><thead><tr><th>Approach</th><th>Accuracy at 50% risk</th><th>Ability to rank risk (AUC)</th><th>Churn concentration in highest-risk 10%</th></tr></thead><tbody>{model_html}</tbody></table></div></section>
+  <section><h2>How well did the approach work?</h2><p class='small'>We ran a fair tournament between XGBoost, CatBoost, and LightGBM using the same unseen customers. <strong>{selected_name}</strong> was selected because it found the most churn among the highest-risk 10% while also giving the most reliable risk estimates. Accuracy means how often a simple yes/no decision is correct at a 50% risk line; because most customers stayed, it is helpful but not the main decision measure.</p><div class='scroll'><table><thead><tr><th>Approach</th><th>Accuracy at 50% risk</th><th>Ability to rank risk (AUC)</th><th>Churn concentration in highest-risk 10%</th></tr></thead><tbody>{model_html}</tbody></table></div></section>
   <section class='two'><div class='chart'>{churn_chart}</div><div class='chart'>{model_chart}</div></section>
   <section><h2>What we learned about customers</h2><p class='small'>These are patterns in past customer behaviour. They point the team toward useful conversations, but they do not prove that any one action caused a customer to leave.</p><div class='driver-grid'><div class='chart'>{auto_renewal_chart}</div><div class='chart'>{frequency_chart}</div><div class='chart'>{recency_chart}</div></div></section>
   <section><div class='callout green'><h2>Campaign recommendation: start with 9,710 customers</h2><p><strong>Why this group?</strong> Contacting the highest-risk 5% gives the largest estimated total value while staying within the current budget. Their average predicted risk of leaving is {number(float(recommendation.average_calibrated_risk)*100,1)}%, so this is a focused list rather than a message sent to everyone.</p><p><strong>What it costs:</strong> {money(float(recommendation.campaign_spend), currency)} at {money(float(config['offer_cost_per_customer']), currency)} per customer contacted. The scenario assumes that 10% of the people who would otherwise leave are persuaded to stay: roughly {number(float(recommendation.expected_saved_customers)):s} customers.</p><p><strong>What success is needed:</strong> the campaign only needs to keep about {number(float(recommendation.break_even_save_rate_percent),2)}% of the customers expected to leave for its estimated retained value to cover the outreach cost. The {money(float(recommendation.scenario_net_value), currency)} figure is a planning estimate, not money already earned.</p></div></section>

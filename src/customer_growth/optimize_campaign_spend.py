@@ -8,9 +8,10 @@ import pandas as pd
 
 PROJECT_ROOT = Path(r"C:\Users\banee\Documents\Codex\2026-08-03\b\outputs\customer-growth-intelligence")
 MODEL_INPUT = PROJECT_ROOT / "data" / "gold" / "model_input_2017-01-31.parquet"
-PREDICTIONS = PROJECT_ROOT / "data" / "gold" / "test_predictions_xgboost.parquet"
+PREDICTIONS = PROJECT_ROOT / "data" / "gold" / "test_predictions_model_tournament.parquet"
 CONFIG = PROJECT_ROOT / "configs" / "campaign_scenario.json"
 REPORTS = PROJECT_ROOT / "reports"
+RISK_COLUMN = "champion_calibrated_probability"
 
 
 def markdown_table(frame: pd.DataFrame) -> str:
@@ -24,7 +25,7 @@ def markdown_table(frame: pd.DataFrame) -> str:
 def evaluate_capacity(frame: pd.DataFrame, capacity_percent: float, config: dict) -> dict:
     target_count = math.ceil(len(frame) * capacity_percent / 100)
     target = frame.head(target_count)
-    expected_churners = target["xgboost_calibrated_probability"].sum()
+    expected_churners = target[RISK_COLUMN].sum()
     value_per_churner = target["monthly_value_proxy"].mean() * config["value_months"]
     spend = target_count * config["offer_cost_per_customer"]
     expected_saved = expected_churners * config["assumed_save_rate"]
@@ -39,7 +40,7 @@ def evaluate_capacity(frame: pd.DataFrame, capacity_percent: float, config: dict
         "customers_targeted": target_count,
         "campaign_spend": round(spend, 2),
         "within_budget": spend <= config["maximum_campaign_budget"],
-        "average_calibrated_risk": round(target["xgboost_calibrated_probability"].mean(), 4),
+        "average_calibrated_risk": round(target[RISK_COLUMN].mean(), 4),
         "expected_churners": round(expected_churners, 1),
         "assumed_save_rate_percent": round(config["assumed_save_rate"] * 100, 2),
         "break_even_save_rate_percent": round(break_even_save_rate * 100, 2),
@@ -71,7 +72,7 @@ def main() -> None:
         .fillna(0)
         * config["value_proxy_multiplier"]
     )
-    ranked = ranked.sort_values("xgboost_calibrated_probability", ascending=False)
+    ranked = ranked.sort_values(RISK_COLUMN, ascending=False)
 
     results = pd.DataFrame(
         [evaluate_capacity(ranked, capacity, config) for capacity in config["capacity_grid_percent"]]
